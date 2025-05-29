@@ -1,36 +1,51 @@
 document.addEventListener('DOMContentLoaded', () => {
     const playerNameInput = document.getElementById('playerName');
-    const playerScoreInput = document.getElementById('playerScore');
-    const saveScoreButton = document.getElementById('saveScoreButton');
-    const messageDisplay = document.getElementById('message');
-    const errorDisplay = document.getElementById('error');
+    const startGameButton = document.getElementById('startGameButton');
+    const nameSetupDiv = document.getElementById('name-setup');
+    const gamePlayDiv = document.getElementById('game-play');
+    const displayPlayerNameSpan = document.getElementById('displayPlayerName');
+    const clickCountSpan = document.getElementById('clickCount');
+    const clickButton = document.getElementById('clickButton');
     const leaderboardList = document.getElementById('leaderboard-list');
+    const submitScoreButton = document.getElementById('submitScoreButton'); // Get the new button
+
+    let playerName = "Anonymous";
+    let clickCount = 0;
 
     // --- JSONBin.io Configuration ---
-    // Make sure your Bin ID and Master Key are correctly set here
     const JSONBIN_BIN_ID = '683805bc8960c979a5a28af2'; // Your provided Bin ID
     const JSONBIN_MASTER_KEY = '$2a$10$f70uReJz0DPw8f.h9AN4fu0XspUA3cs3pKerRqXOLGB4Na9PFTare'; // Your provided Secret Key
     const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
-    // Function to display messages
-    function showMessage(msg, type = 'success') {
-        messageDisplay.textContent = ''; // Clear previous messages
-        errorDisplay.textContent = '';
-        if (type === 'success') {
-            messageDisplay.textContent = msg;
-        } else {
-            errorDisplay.textContent = msg;
+    // --- Game Initialization ---
+    startGameButton.addEventListener('click', () => {
+        const inputName = playerNameInput.value.trim();
+        if (inputName) {
+            playerName = inputName;
         }
-        setTimeout(() => {
-            messageDisplay.textContent = '';
-            errorDisplay.textContent = '';
-        }, 3000); // Clear message after 3 seconds
-    }
+        displayPlayerNameSpan.textContent = playerName;
+        nameSetupDiv.style.display = 'none'; // Hide name setup
+        gamePlayDiv.style.display = 'block'; // Show game play area
 
-    // Function to load scores from JSONBin.io
-    async function loadScores() {
-        leaderboardList.innerHTML = '<li>Loading scores...</li>'; // Show loading message
-        errorDisplay.textContent = ''; // Clear previous errors
+        // Reset game state for a new session
+        clickCount = 0;
+        clickCountSpan.textContent = clickCount;
+        clickButton.disabled = false; // Enable click button
+        submitScoreButton.style.display = 'block'; // Ensure submit button is visible
+
+        loadLeaderboard(); // Load leaderboard when game starts
+    });
+
+    // --- Click Logic ---
+    clickButton.addEventListener('click', () => {
+        clickCount++;
+        clickCountSpan.textContent = clickCount;
+    });
+
+    // --- Leaderboard Interaction with JSONBin.io ---
+
+    async function loadLeaderboard() {
+        leaderboardList.innerHTML = '<li>Loading leaderboard...</li>'; // Show loading message
 
         try {
             const response = await fetch(JSONBIN_URL, {
@@ -65,40 +80,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         const score = typeof entry.score === 'number' ? entry.score : 0;
                         listItem.innerHTML = `
                             <span>#${index + 1} ${name}</span>
-                            <span>${score} Points</span>
+                            <span>${score} Clicks</span>
                         `;
                         leaderboardList.appendChild(listItem);
                     });
                 }
             } else {
-                console.error('Failed to load scores from JSONBin:', response.statusText);
-                showMessage('Failed to load scores. Check console for details.', 'error');
-                leaderboardList.innerHTML = '<li>Error loading scores.</li>';
+                console.error('Failed to load leaderboard from JSONBin:', response.statusText);
+                leaderboardList.innerHTML = '<li>Error loading leaderboard.</li>';
             }
         } catch (error) {
-            console.error('Error loading scores:', error);
-            showMessage('Network error loading scores. Check your connection.', 'error');
-            leaderboardList.innerHTML = '<li>Error loading scores.</li>';
+            console.error('Error loading leaderboard:', error);
+            leaderboardList.innerHTML = '<li>Error loading leaderboard.</li>';
         }
     }
 
-    // Function to save a new score to JSONBin.io
     async function saveScore() {
-        const name = playerNameInput.value.trim();
-        const score = parseInt(playerScoreInput.value, 10);
-
-        if (!name) {
-            showMessage('Please enter a name.', 'error');
-            return;
-        }
-        if (isNaN(score) || score < 0) {
-            showMessage('Please enter a valid positive score.', 'error');
-            return;
-        }
-
-        saveScoreButton.disabled = true; // Disable button to prevent multiple submissions
-        saveScoreButton.textContent = 'Saving...';
-        errorDisplay.textContent = ''; // Clear previous errors
+        // Disable button to prevent multiple submissions during the save process
+        submitScoreButton.disabled = true;
+        submitScoreButton.textContent = 'Submitting...';
 
         try {
             // 1. Get the current content of the bin
@@ -116,19 +116,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (getResponse.ok) {
                 const data = await getResponse.json();
                 binContent = data; // Store the entire object
+                // Access the 'scores' array, create empty if it doesn't exist
                 currentScores = data.scores && Array.isArray(data.scores) ? data.scores : [];
             } else if (getResponse.status !== 404) { // 404 might mean bin is empty/new, which is fine
                 console.error('Failed to retrieve current scores before saving:', getResponse.statusText);
-                showMessage('Failed to get current scores. Cannot save.', 'error');
-                saveScoreButton.disabled = false;
-                saveScoreButton.textContent = 'Save Score';
+                alert('Failed to get current scores. Cannot save.');
                 return;
             }
 
-            // 2. Add the new score
-            currentScores.push({ name: name, score: score, timestamp: new Date().toISOString() });
+            // 2. Add the new score only if clicks are positive
+            if (clickCount > 0) {
+                currentScores.push({ name: playerName, score: clickCount, timestamp: new Date().toISOString() });
+            }
 
-            // 3. Optional: Limit the number of entries
+            // 3. Limit the number of entries
             currentScores.sort((a, b) => {
                 if (b.score !== a.score) {
                     return b.score - a.score;
@@ -152,26 +153,50 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (updateResponse.ok) {
-                showMessage('Score saved successfully!', 'success');
-                loadScores(); // Reload and display updated leaderboard
+                console.log('Score saved successfully to JSONBin!');
+                loadLeaderboard(); // Reload and display updated leaderboard
+                alert(`Game Over! You clicked ${clickCount} times. Your score has been submitted.`);
             } else {
                 console.error('Failed to save score to JSONBin:', updateResponse.statusText);
                 const errorDetails = await updateResponse.text();
                 console.error('JSONBin Error Details:', errorDetails);
-                showMessage('Failed to save score. See console for details.', 'error');
+                alert('Failed to save your score. Please try again.');
             }
         } catch (error) {
             console.error('Error saving score:', error);
-            showMessage('Network error saving score. Check your connection.', 'error');
+            alert('An unexpected error occurred while saving your score. Check your connection.');
         } finally {
-            saveScoreButton.disabled = false;
-            saveScoreButton.textContent = 'Save Score';
+            // Re-enable and reset button text regardless of success/failure
+            submitScoreButton.disabled = false;
+            submitScoreButton.textContent = 'Submit Score';
         }
     }
 
-    // --- Event Listeners ---
-    saveScoreButton.addEventListener('click', saveScore);
+    // --- Game End and Reset Logic ---
+    function endGameAndReset() {
+        clickButton.disabled = true; // Disable the click button
+        submitScoreButton.style.display = 'none'; // Hide submit button after click
 
-    // Initial load of scores when the page loads
-    loadScores();
+        // Only try to save score if user actually clicked
+        if (clickCount > 0) {
+            saveScore(); // This function now handles its own alerts for success/failure
+        } else {
+            alert("You didn't click anything! No score to submit.");
+        }
+
+        // Reset UI for a new game after a short delay
+        setTimeout(() => {
+            clickCount = 0;
+            clickCountSpan.textContent = 0;
+            playerNameInput.value = ''; // Clear name input
+            nameSetupDiv.style.display = 'block'; // Show name setup again
+            gamePlayDiv.style.display = 'none'; // Hide game play area
+        }, 2000); // Wait 2 seconds before resetting UI
+    }
+
+    // --- Event Listeners ---
+    submitScoreButton.addEventListener('click', endGameAndReset);
+
+    // Hide the submit button initially when the page loads
+    submitScoreButton.style.display = 'none';
 });
