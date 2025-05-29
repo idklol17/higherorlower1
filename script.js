@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Select all necessary elements by their IDs
     const playerNameInput = document.getElementById('playerName');
     const startGameButton = document.getElementById('startGameButton');
     const nameSetupDiv = document.getElementById('name-setup');
@@ -7,39 +8,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const clickCountSpan = document.getElementById('clickCount');
     const clickButton = document.getElementById('clickButton');
     const leaderboardList = document.getElementById('leaderboard-list');
-    const submitScoreButton = document.getElementById('submitScoreButton'); // Get the new button
+    const submitScoreButton = document.getElementById('submitScoreButton');
 
+    // Game state variables
     let playerName = "Anonymous";
     let clickCount = 0;
 
     // --- JSONBin.io Configuration ---
+    // Ensure these are your correct and current keys
     const JSONBIN_BIN_ID = '683805bc8960c979a5a28af2'; // Your provided Bin ID
     const JSONBIN_MASTER_KEY = '$2a$10$f70uReJz0DPw8f.h9AN4fu0XspUA3cs3pKerRqXOLGB4Na9PFTare'; // Your provided Secret Key
     const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
     // --- Game Initialization ---
+    // This function runs when the "Start Game" button is clicked
     startGameButton.addEventListener('click', () => {
         const inputName = playerNameInput.value.trim();
         if (inputName) {
             playerName = inputName;
+        } else {
+            playerName = "Anonymous"; // Default if input is empty
         }
-        displayPlayerNameSpan.textContent = playerName;
-        nameSetupDiv.style.display = 'none'; // Hide name setup
-        gamePlayDiv.style.display = 'block'; // Show game play area
+        displayPlayerNameSpan.textContent = playerName; // Display player name
+        nameSetupDiv.style.display = 'none'; // Hide name setup screen
+        gamePlayDiv.style.display = 'block'; // Show game play screen
 
-        // Reset game state for a new session
+        // Reset game state for a new round
         clickCount = 0;
-        clickCountSpan.textContent = clickCount;
+        clickCountSpan.textContent = clickCount; // Update click display
         clickButton.disabled = false; // Enable click button
         submitScoreButton.style.display = 'block'; // Ensure submit button is visible
 
-        loadLeaderboard(); // Load leaderboard when game starts
+        loadLeaderboard(); // Load the leaderboard immediately when game starts
     });
 
     // --- Click Logic ---
     clickButton.addEventListener('click', () => {
         clickCount++;
-        clickCountSpan.textContent = clickCount;
+        clickCountSpan.textContent = clickCount; // Update click count display
     });
 
     // --- Leaderboard Interaction with JSONBin.io ---
@@ -52,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'GET',
                 headers: {
                     'X-Master-Key': JSONBIN_MASTER_KEY,
-                    'X-Bin-Meta': 'false' // Get only the content
+                    'X-Bin-Meta': 'false' // Get only the content, not metadata
                 }
             });
 
@@ -73,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (scores.length === 0) {
                     leaderboardList.innerHTML = '<li>No scores yet. Be the first!</li>';
                 } else {
-                    scores.slice(0, 10).forEach((entry, index) => { // Display top 10
+                    scores.slice(0, 10).forEach((entry, index) => { // Display top 10 scores
                         const listItem = document.createElement('li');
                         // Ensure name and score are valid before displaying
                         const name = entry.name ? String(entry.name) : 'Unknown';
@@ -173,13 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Game End and Reset Logic ---
+    // This function is called when "Submit Score" is clicked
     function endGameAndReset() {
         clickButton.disabled = true; // Disable the click button
         submitScoreButton.style.display = 'none'; // Hide submit button after click
 
         // Only try to save score if user actually clicked
         if (clickCount > 0) {
-            saveScore(); // This function now handles its own alerts for success/failure
+            saveScore(); // This function handles the actual saving and its own alerts
         } else {
             alert("You didn't click anything! No score to submit.");
         }
@@ -188,15 +195,16 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             clickCount = 0;
             clickCountSpan.textContent = 0;
-            playerNameInput.value = ''; // Clear name input
-            nameSetupDiv.style.display = 'block'; // Show name setup again
+            playerNameInput.value = ''; // Clear name input for next game
+            nameSetupDiv.style.display = 'block'; // Show name setup screen again
             gamePlayDiv.style.display = 'none'; // Hide game play area
         }, 2000); // Wait 2 seconds before resetting UI
     }
 
     // --- Event Listeners ---
+    // The "Submit Score" button now directly triggers the end game and reset sequence
     submitScoreButton.addEventListener('click', endGameAndReset);
 
-    // Hide the submit button initially when the page loads
+    // Initial state setup: Hide the submit button when the page first loads
     submitScoreButton.style.display = 'none';
 });
